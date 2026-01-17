@@ -3,4 +3,5 @@
 *.mem
 *.css
 *.cov
+/lcov.info
 flamegraph.svg
