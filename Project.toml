@@ -1,10 +1,16 @@
 name = "PenroseFactors"
 uuid = "89b54858-66ec-43ce-b1a5-8cb1127c371b"
-authors = ["KlausC <klausC@users.noreply.github.com> and contributors"]
 version = "1.0.0-DEV"
+authors = ["KlausC <klausC@users.noreply.github.com> and contributors"]
+
+[deps]
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+StatProfilerHTML = "a8a75453-ed82-57c9-9e16-4cd1196ecbf5"
 
 [compat]
-julia = "1.10.10"
+LinearAlgebra = "1.12.0"
+StatProfilerHTML = "1.6.0"
+julia = "1.12"
 
 [extras]
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"

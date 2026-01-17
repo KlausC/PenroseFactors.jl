@@ -1,7 +1,5 @@
 module PenroseFactors
 
-module PenroseFactors
-
 using LinearAlgebra
 export Penrose
 export penrose, penrose!
@@ -133,7 +131,7 @@ function rq!(M::AbstractMatrix)
     return QRPartial(M, τ)
 end
 
-function rqr!(A::UpperTriangular, B::AbstractMatrix, τ::AbstractVector)
+function rqr!(A::UpperTriangular, B::AbstractMatrix{T}, τ::AbstractVector) where T
     require_one_based_indexing(A, B, τ)
     m, m1 = size(A)
     m == m1 || throw(DimensionMismatch(lazy"Matrix A must be quare but is [$m,$m1]"))
@@ -141,6 +139,7 @@ function rqr!(A::UpperTriangular, B::AbstractMatrix, τ::AbstractVector)
     m == m1 || throw(DimensionMismatch(lazy"Matrix B must be [$m,:] but is [$m1,:]"))
     m1 = size(τ, 1)
     m == m1 || throw(DimensionMismatch(lazy"Matrix τ must be [$m] but is [$m1]"))
+    B2 = axes(B, 2)
 
     if n == 0
         τ .= 0
@@ -169,9 +168,15 @@ function rqr!(A::UpperTriangular, B::AbstractMatrix, τ::AbstractVector)
         B[k, :] .*= vi
         A[k, k] = -akk
         for j = k-1:-1:1
-            bjk = (dot(view(B, j, :), view(B, k, :)) + conj(A[j, k])) * tauk
+            bjk = A[j, k]'
+            @inbounds for i in B2
+                bjk += B[j, i]' * B[k, i]
+            end
+            bjk *= tauk
             A[j, k] -= bjk
-            B[j, :] .-= view(B, k, :) .* bjk
+            @inbounds for i in B2
+                B[j, i] -= B[k, i] * bjk
+            end
         end
     end
     return A, B, τ
@@ -198,9 +203,15 @@ function _rmul!(A::AbstractMatrix, Q::QRPartialQ, ud::Val)
         for k = rrange
             tauk = τ[k]
             iszero(tauk) && continue
-            bik = (A[i, k] + dot(view(B, k, rn), view(A, i, rn))) * tauk
+            bik = A[i, k]
+            @inbounds for ix in rn
+                bik = B[k, ix]' * A[i, ix]
+            end
+            bik *= tauk
             A[i, k] -= bik
-            A[i, rn] .-= view(B, k, rn) .* bik
+            @inbounds for ix in rn
+                A[i, ix] -= B[k, ix] * bik
+            end
         end
     end
     return A
@@ -217,9 +228,15 @@ function _lmul!(Q::QRPartialQ, A::AbstractVecOrMat, ud::Val)
         for k = rrange
             tauk = τ[k]
             iszero(tauk) && continue
-            bik = (A[k, i] + dot(view(B, k, rm), view(A, rm, i))) * tauk
+            bik = A[k, i]
+            @inbounds for ix in rm
+                bik += B[k, ix]' * A[ix, i]
+            end
+            bik *= tauk
             A[k, i] -= bik
-            A[rm, i] .-= view(B, k, rm) .* bik
+            @inbounds for ix in rm
+                A[ix, i] -= B[k, ix] * bik
+            end
         end
     end
     return A
@@ -255,7 +272,4 @@ function testmatrix(m::Int, n::Int, d::AbstractVector)
     U * Diagonal(d) * V'
 end
 
-end
-
-
-end
+end # PenroseFactors

@@ -1,1 +1,5 @@
 /Manifest*.toml
+*.html
+*.mem
+*.css
+flamegraph.svg
