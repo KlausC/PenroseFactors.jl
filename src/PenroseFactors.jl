@@ -279,7 +279,7 @@ function testmatrix(m::Int, n::Int, d::AbstractVector{T}) where T<:Number
     U * Diagonal(d) * V'
 end
 
-if VERSION >= v"1.2"
+if VERSION >= v"1.12"
     _rank(A::QRPivoted; atol::Real=0, rtol::Real=rtol(A, atol)) = rank(A; atol, rtol)
 else
     """
