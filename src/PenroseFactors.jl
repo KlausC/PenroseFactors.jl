@@ -19,7 +19,7 @@ end
 size(pf::Penrose) = size(pf.QR)
 size(pf::Penrose, i::Integer) = size(pf.QR, i)
 
-function Base.getproperty(F::Penrose, s::Symbol)
+function Base.getproperty(F::Penrose{T}, s::Symbol) where T
     if s === :U
         qrf = getfield(F, :QR)
         r = size(getfield(F, :σ), 1)
@@ -28,6 +28,16 @@ function Base.getproperty(F::Penrose, s::Symbol)
         return getfield(F, :σ).R
     elseif s === :V
         getfield(F, :σ).Q
+    elseif s == :p
+        getfield(F, :QR).p
+    elseif s === :P
+        p = F.p
+        n = length(p)
+        P = zeros(T, n, n)
+        for i in 1:n
+            P[p[i], i] = one(T)
+        end
+        return P
     else
         getfield(F, s)
     end
@@ -43,7 +53,7 @@ function penrose!(A::AbstractMatrix; atol::Real=0, rtol::Real=rtol(A, atol))
     m, n = size(A)
     qrf = qr!(A, ColumnNorm())
     r = rank(qrf; atol, rtol) # requires Julia1.12 copy impl. for lower versions
-    qrf.τ[r+1:n] .= 0
+    qrf.τ[r+1:min(n, m)] .= 0
     #qrf.factors[r+1:m, r+1:n] .= 0
     lqf = rq!(view(A, 1:r, :))
     return Penrose(qrf, lqf)
@@ -168,9 +178,9 @@ function rqr!(A::UpperTriangular, B::AbstractMatrix{T}, τ::AbstractVector) wher
         B[k, :] .*= vi
         A[k, k] = -akk
         for j = k-1:-1:1
-            bjk = A[j, k]'
+            bjk = A[j, k]
             @inbounds for i in B2
-                bjk += B[j, i]' * B[k, i]
+                bjk += B[j, i] * B[k, i]'
             end
             bjk *= tauk
             A[j, k] -= bjk
@@ -205,7 +215,7 @@ function _rmul!(A::AbstractMatrix, Q::QRPartialQ, ud::Val)
             iszero(tauk) && continue
             bik = A[i, k]
             @inbounds for ix in rn
-                bik = B[k, ix]' * A[i, ix]
+                bik += B[k, ix]' * A[i, ix]
             end
             bik *= tauk
             A[i, k] -= bik
@@ -230,12 +240,12 @@ function _lmul!(Q::QRPartialQ, A::AbstractVecOrMat, ud::Val)
             iszero(tauk) && continue
             bik = A[k, i]
             @inbounds for ix in rm
-                bik += B[k, ix]' * A[ix, i]
+                bik += B[k, ix] * A[ix, i]
             end
             bik *= tauk
             A[k, i] -= bik
             @inbounds for ix in rm
-                A[ix, i] -= B[k, ix] * bik
+                A[ix, i] -= B[k, ix]' * bik
             end
         end
     end
@@ -265,10 +275,10 @@ end
 
 testmatrix(m::Int, n::Int, r::Int) = testmatrix(m, n, [2.0^(1 - j) for j = 1:r])
 
-function testmatrix(m::Int, n::Int, d::AbstractVector)
+function testmatrix(m::Int, n::Int, d::AbstractVector{T}) where T<:Number
     r = length(d)
-    U = qr!(rand(m, r)).Q
-    V = qr!(rand(n, r)).Q
+    U = qr!(rand(T, m, r)).Q
+    V = qr!(rand(T, n, r)).Q
     U * Diagonal(d) * V'
 end
 
