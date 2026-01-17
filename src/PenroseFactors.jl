@@ -12,7 +12,7 @@ import Base: size
 
 struct Penrose{T,Q,V} <: Factorization{T}
     QR::Q
-    σ::V
+    RQ::V
     Penrose(qrf::U, rqf::V) where {T,U<:Factorization{T},V} = new{T,U,V}(qrf, rqf)
 end
 
@@ -21,13 +21,13 @@ size(pf::Penrose, i::Integer) = size(pf.QR, i)
 
 function Base.getproperty(F::Penrose{T}, s::Symbol) where T
     if s === :U
-        qrf = getfield(F, :QR)
-        r = size(getfield(F, :σ), 1)
-        return QRPackedQ(view(qrf.Q.factors, :, 1:r), view(qrf.Q.τ, 1:r))
+        Q = getfield(F, :QR).Q
+        r = size(getfield(F, :RQ), 1)
+        r == length(Q.τ) ? Q : QRPackedQ(view(Q.factors, :, 1:r), view(Q.τ, 1:r))
     elseif s === :R
-        return getfield(F, :σ).R
+        return getfield(F, :RQ).R
     elseif s === :V
-        getfield(F, :σ).Q
+        getfield(F, :RQ).Q
     elseif s == :p
         getfield(F, :QR).p
     elseif s === :P
@@ -45,14 +45,14 @@ end
 
 rtol(A::AbstractArray{T}, a) where T = min(size(A)...) * eps(real(float(T))) * iszero(a)
 
-function penrose(A::AbstractMatrix; atol::Real=0, rtol::Real=rtol(A, atol))
-    penrose!(copy(A); atol, rtol)
+function penrose(A::AbstractMatrix; atol::Real=0, rtol::Real=rtol(A, atol), rk::Int=-1)
+    penrose!(copy(A); atol, rtol, rk)
 end
 
-function penrose!(A::AbstractMatrix; atol::Real=0, rtol::Real=rtol(A, atol))
+function penrose!(A::AbstractMatrix; atol::Real=0, rtol::Real=rtol(A, atol), rk::Int)
     m, n = size(A)
     qrf = qr!(A, ColumnNorm())
-    r = rank(qrf; atol, rtol) # requires Julia1.12 copy impl. for lower versions
+    r = rk >= 0 ? rk : rank(qrf; atol, rtol) # requires Julia1.12 copy impl. for lower versions
     qrf.τ[r+1:min(n, m)] .= 0
     #qrf.factors[r+1:m, r+1:n] .= 0
     lqf = rq!(view(A, 1:r, :))
@@ -109,7 +109,7 @@ function _ldiv!(w, pf::Penrose, v)
     return w # view(w, invperm(p), :)
 end
 
-rank(pf::Penrose) = size(pf.σ, 1)
+rank(pf::Penrose) = size(pf.RQ, 1)
 
 \(pf::Penrose, v::AbstractVector) = ldiv!(similar(v, size(pf, 2)), pf, copy(v))
 \(pf::Penrose, v::AbstractMatrix) = ldiv!(similar(v, size(pf, 2), size(v, 2)), pf, copy(v))
@@ -120,49 +120,44 @@ function pinv(pf::Penrose{T}) where T
 end
 
 """
-    rqr!(A::UpperTriangular, B::Matrix, τ::Vector)
+    rq!(M::AbstractMatrix)::QRPartial
+
+Perform a R-Q factorization of flat matrix `M` in-memory.
+
+Actually only upper part of `M` is used or modified.
+
+`M == [A B]; m, n = size(M)`
+
+A real vector `τ` of length `size(M, 1)` is allocated
 
 Under the condition, that `A` is regular upper triangular of size `m`,
 calculate a factorization `[A B] = R * Q` where `R` is a upper triangular matrix
- and `Q` is unitary.
-After the calculation, `R` has overwritten the upper right part of `A`.
+and `Q` is unitary.
+
+After the calculation, `R` has overwritten the upper right part of `A` in `M`.
 The `Q` is represented a the product `Q = prod H[i]` where
 `H[i] = I - τ[i] * v[i]' * v[i]` and
-`v[i,j] = `1 for i == j; 0 for j <= m; B[i,j] for j > m`.
+`v[i,j] = `1 for i == j; 0 for j <= m; M[i,j] for j > m`.
 
-Only the data fields of `A`, `B`, and `τ` are modified.
+An `AbstractQ` object is returned, which contains all relevent information of `M` and `τ`.
 """
-function rq!(M::AbstractMatrix)
+function rq!(M::AbstractMatrix{T}) where T
     require_one_based_indexing(M)
-    m, n = size(M)
-    rn = m+1:n
-    τ = zeros(real(eltype(M)), m)
-    rqr!(UpperTriangular(view(M, 1:m, 1:m)), view(M, 1:m, rn), τ)
-    return QRPartial(M, τ)
-end
-
-function rqr!(A::UpperTriangular, B::AbstractMatrix{T}, τ::AbstractVector) where T
-    require_one_based_indexing(A, B, τ)
-    m, m1 = size(A)
-    m == m1 || throw(DimensionMismatch(lazy"Matrix A must be quare but is [$m,$m1]"))
-    m1, n = size(B)
-    m == m1 || throw(DimensionMismatch(lazy"Matrix B must be [$m,:] but is [$m1,:]"))
-    m1 = size(τ, 1)
-    m == m1 || throw(DimensionMismatch(lazy"Matrix τ must be [$m] but is [$m1]"))
-    B2 = axes(B, 2)
-
-    if n == 0
-        τ .= 0
-        return
+    m, m1 = size(M)
+    m <= m1 || throw(DimensionMismatch(lazy"Matrix A must be flat but is [$m,$m1]"))
+    B2 = m+1:m1
+    τ = zeros(real(T), m)
+    if m == m1
+        return QRPartial(M, τ)
     end
 
     for k = m:-1:1
-        β = sum(abs2, view(B, k, :))
+        β = sum(abs2, view(M, k, B2))
         if iszero(β)
             τ[k] = 0
             continue
         end
-        akk = A[k, k]
+        akk = M[k, k]
         α = abs2(akk)
         if iszero(α)
             v = akk = sqrt(β)
@@ -175,21 +170,21 @@ function rqr!(A::UpperTriangular, B::AbstractMatrix{T}, τ::AbstractVector) wher
         end
         vi = inv(v)
         τ[k] = tauk
-        B[k, :] .*= vi
-        A[k, k] = -akk
-        for j = k-1:-1:1
-            bjk = A[j, k]
-            @inbounds for i in B2
-                bjk += B[j, i] * B[k, i]'
+        M[k, B2] .*= vi
+        M[k, k] = -akk
+        @inbounds for j = k-1:-1:1
+            bjk = M[j, k]
+            for i in B2
+                bjk += M[j, i] * M[k, i]'
             end
             bjk *= tauk
-            A[j, k] -= bjk
-            @inbounds for i in B2
-                B[j, i] -= B[k, i] * bjk
+            M[j, k] -= bjk
+            for i in B2
+                M[j, i] -= M[k, i] * bjk
             end
         end
     end
-    return A, B, τ
+    return QRPartial(M, τ)
 end
 
 rmul!(A::AbstractMatrix, Q::QRPartialQ) = _rmul!(A, Q, Val(:UP))
@@ -203,23 +198,24 @@ lmul!(Q::AdjointQ{<:Any,<:QRPartialQ}, A::AbstractVecOrMat) = _lmul!(Q.Q, A, Val
 #ldiv!(Q::AdjointQ{<:Any,<:QRPartialQ}, A::AbstractVecOrMat) = _lmul!(Q.Q, A, Val(:DOWN))
 
 function _rmul!(A::AbstractMatrix, Q::QRPartialQ, ud::Val)
+    require_one_based_indexing(A)
     B, τ = Q.factors, Q.τ
     m, n = size(A)
     r, n1 = size(B)
     size_check(A, Q)
     rn = r+1:min(n, n1)
     rrange = updown(ud, r)
-    for i = 1:m
+    @inbounds for i = 1:m
         for k = rrange
             tauk = τ[k]
             iszero(tauk) && continue
             bik = A[i, k]
-            @inbounds for ix in rn
+            for ix in rn
                 bik += B[k, ix]' * A[i, ix]
             end
             bik *= tauk
             A[i, k] -= bik
-            @inbounds for ix in rn
+            for ix in rn
                 A[i, ix] -= B[k, ix] * bik
             end
         end
@@ -228,23 +224,24 @@ function _rmul!(A::AbstractMatrix, Q::QRPartialQ, ud::Val)
 end
 
 function _lmul!(Q::QRPartialQ, A::AbstractVecOrMat, ud::Val)
+    require_one_based_indexing(A)
     B, τ = Q.factors, Q.τ
     m, n = size(A, 1), size(A, 2)
     r, m1 = size(B)
     size_check(Q, A)
     rm = r+1:min(m, m1)
     rrange = updown(ud, r)
-    for i = 1:n
+    @inbounds for i = 1:n
         for k = rrange
             tauk = τ[k]
             iszero(tauk) && continue
             bik = A[k, i]
-            @inbounds for ix in rm
+            for ix in rm
                 bik += B[k, ix] * A[ix, i]
             end
             bik *= tauk
             A[k, i] -= bik
-            @inbounds for ix in rm
+            for ix in rm
                 A[ix, i] -= B[k, ix]' * bik
             end
         end
