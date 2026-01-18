@@ -87,7 +87,7 @@ end
 Base.size(F::QRPartial, dims...) = size(F.factors, dims...)
 Base.size(Q::QRPartialQ) = (n = size(Q.factors, 2); (n, n))
 
-LinearAlgebra.Matrix(pf::Penrose) = (pf.U*(pf.R*pf.V))[:, invperm(qrf.p)]
+LinearAlgebra.Matrix(pf::Penrose) = (pf.U*(pf.R*pf.V))[:, invperm(pf.p)]
 
 LinearAlgebra.ldiv!(w::AbstractVector, pf::Penrose, v::AbstractVector) = _ldiv!(w, pf, v)
 LinearAlgebra.ldiv!(w::AbstractMatrix, pf::Penrose, v::AbstractMatrix) = _ldiv!(w, pf, v)
