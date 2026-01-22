@@ -49,7 +49,7 @@ function penrose(A::AbstractMatrix; atol::Real=0, rtol::Real=rtol(A, atol), rk::
     penrose!(copy(A); atol, rtol, rk)
 end
 
-function penrose!(A::AbstractMatrix; atol::Real=0, rtol::Real=rtol(A, atol), rk::Int)
+function penrose!(A::AbstractMatrix; atol::Real=0, rtol::Real=rtol(A, atol), rk::Int=-1)
     m, n = size(A)
     qrf = qr!(A, ColumnNorm())
     r = rk >= 0 ? rk : _rank(qrf; atol, rtol) # requires Julia1.12 copy impl. for lower versions
@@ -170,7 +170,9 @@ function rq!(M::AbstractMatrix{T}) where T
         end
         vi = inv(v)
         τ[k] = tauk
-        M[k, B2] .*= vi
+        for ix in B2
+            M[k, ix] *= vi
+        end
         M[k, k] = -akk
         @inbounds for j = k-1:-1:1
             bjk = M[j, k]
@@ -311,6 +313,56 @@ else
         return something(findfirst(i -> abs(A.factors[i, i]) <= tol, 1:m), m + 1) - 1
     end
 end
+
+"""
+    tau_v_from_a_b(a::Complex, b::Real, Val(N)) where N in {1,2,3}
+
+    - In principle v max by any complex number with abs(v - a) = hypot(a, b)
+    -  Of special interest
+    - 1. abs(v) is maximal, τ is real - Bulirsch-Stoer
+    - 2. v - a is real - used in LAPACK qr
+    - 3. v is real or pure imaginary - less multiplication effort with vectors
+"""
+function tau_v_from_a_b(a, b, ::Val) end
+
+function tau_v_from_a_b(a::T, b::Real, ::Val{1}) where T<:Union{Real,Complex}
+    if iszero(b)
+        return zero(real(T)), b
+    end
+    if iszero(a)
+        return oneunit(real(T)), b
+    end
+    v = (a isa Real ? copysign(hypot(a, b), a) : hypot(a, b) * sign(a)) + a
+    τ = 2 / ((b / abs(v))^2 + 1)
+    return τ, v
+end
+
+function tau_v_from_a_b(a::T, b::Real, ::Val{2}) where T<:Union{Real,Complex}
+    if iszero(b)
+        return zero(real(T)), b
+    end
+    v = copysign(hypot(a, b), real(a)) + a
+    τ = inv(((b / abs(v))^2 + 1) / 2 + imag(a / v) * im)
+    return τ, v
+end
+
+function tau_v_from_a_b(a::T, b::Real, ::Val{3}) where T<:Union{Real,Complex}
+    if iszero(b)
+        return zero(real(T)), b
+    end
+    ar, ai = real(a), imag(a)
+    if abs(ar) >= abs(ai)
+        ax = real(a)
+        s = 1
+    else
+        ax = ai
+        s = im
+    end
+    v = (copysign(hypot(ax, b), ax) + ax ) * s
+    τ = inv(((b / abs(v))^2 + 1) / 2 + imag(a / v) * im)
+    return τ, v
+end
+
 
 
 end # PenroseFactors
