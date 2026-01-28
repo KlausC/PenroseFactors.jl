@@ -10,6 +10,8 @@ import LinearAlgebra: *, \, pinv, rank, adjoint
 import LinearAlgebra: rmul!, rdiv!, lmul!, ldiv!, qsize_check
 import Base: size
 
+include("householder.jl")
+
 struct Penrose{T,Q,V} <: Factorization{T}
     QR::Q
     RQ::V
@@ -313,56 +315,5 @@ else
         return something(findfirst(i -> abs(A.factors[i, i]) <= tol, 1:m), m + 1) - 1
     end
 end
-
-"""
-    tau_v_from_a_b(a::Complex, b::Real, Val(N)) where N in {1,2,3}
-
-    - In principle v max by any complex number with abs(v - a) = hypot(a, b)
-    -  Of special interest
-    - 1. abs(v) is maximal, τ is real - Bulirsch-Stoer
-    - 2. v - a is real - used in LAPACK qr
-    - 3. v is real or pure imaginary - less multiplication effort with vectors
-"""
-function tau_v_from_a_b(a, b, ::Val) end
-
-function tau_v_from_a_b(a::T, b::Real, ::Val{1}) where T<:Union{Real,Complex}
-    if iszero(b)
-        return zero(real(T)), b
-    end
-    if iszero(a)
-        return oneunit(real(T)), b
-    end
-    v = (a isa Real ? copysign(hypot(a, b), a) : hypot(a, b) * sign(a)) + a
-    τ = 2 / ((b / abs(v))^2 + 1)
-    return τ, v
-end
-
-function tau_v_from_a_b(a::T, b::Real, ::Val{2}) where T<:Union{Real,Complex}
-    if iszero(b)
-        return zero(real(T)), b
-    end
-    v = copysign(hypot(a, b), real(a)) + a
-    τ = inv(((b / abs(v))^2 + 1) / 2 + imag(a / v) * im)
-    return τ, v
-end
-
-function tau_v_from_a_b(a::T, b::Real, ::Val{3}) where T<:Union{Real,Complex}
-    if iszero(b)
-        return zero(real(T)), b
-    end
-    ar, ai = real(a), imag(a)
-    if abs(ar) >= abs(ai)
-        ax = real(a)
-        s = 1
-    else
-        ax = ai
-        s = im
-    end
-    v = (copysign(hypot(ax, b), ax) + ax ) * s
-    τ = inv(((b / abs(v))^2 + 1) / 2 + imag(a / v) * im)
-    return τ, v
-end
-
-
 
 end # PenroseFactors
