@@ -5,14 +5,18 @@ authors = ["KlausC <klausC@users.noreply.github.com> and contributors"]
 
 [deps]
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+MultiFloats = "bdf0d083-296b-4888-a5b6-7498122e68a5"
+StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 
 [compat]
 LinearAlgebra = "1.10.0"
+MultiFloats = "3.0.0"
+StaticArrays = "1.9.16"
 julia = "1.10"
 
 [extras]
-Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 StatProfilerHTML = "a8a75453-ed82-57c9-9e16-4cd1196ecbf5"
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [targets]
 test = ["Test"]
