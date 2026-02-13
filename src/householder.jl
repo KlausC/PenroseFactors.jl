@@ -166,15 +166,16 @@ function MGS!(A, ::ColumnNorm)
         d[j] = sum(abs2, view(A, :, j))
     end
     for i = 1:mn
-        di, piv = findmax(view(d, i:n))
+        _, piv = findmax(view(d, i:n))
         piv += i - 1
         if piv != i
             switchcol!(A, 1:m, i, piv)
             switchcol!(R, 1:i-1, i, piv)
-            d[i], d[piv] = d[piv], d[i]
+            d[piv] = d[i]
             p[i], p[piv] = p[piv], p[i]
         end
-        R[i,i] = 1
+        di = d[i] = sum(abs2, view(A, :, i))
+        R[i, i] = 1
         for j = i+1:n
             aa = dot(view(A, :, j), view(A, :, i))
             rr = aa / di
@@ -182,15 +183,18 @@ function MGS!(A, ::ColumnNorm)
             for k = 1:m
                 A[k, j] -= A[k, i] * rr
             end
-            d[j] = sum(abs2, view(A, :, j))
-            #d[j] -= conj(aa) * rr # inexact
+            # d[j] = sum(abs2, view(A, :, j)) # exact
+            d[j] -= conj(aa) * rr # inexact
         end
+    end
+    for i = mn+1:n
+        d[i] = sum(abs2, view(A, :, i)) # enforce exactness
     end
     return A, R, d, p
 end
 
 function switchcol!(A, range, i, j)
     for k in range
-        A[k,i], A[k,j] = A[k,j], A[k,i]
+        A[k, i], A[k, j] = A[k, j], A[k, i]
     end
 end

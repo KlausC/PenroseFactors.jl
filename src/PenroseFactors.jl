@@ -3,6 +3,7 @@ module PenroseFactors
 using LinearAlgebra
 export Penrose
 export penrose, penrose!
+export householder_column, householder_standard!, householder_row, householder_bidiag, MGS!
 
 using LinearAlgebra: AdjointQ, require_one_based_indexing, QRPackedQ, AbstractQ
 
