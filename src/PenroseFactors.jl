@@ -12,6 +12,7 @@ import LinearAlgebra: rmul!, rdiv!, lmul!, ldiv!, qsize_check
 import Base: size
 
 include("householder.jl")
+include("fractals.jl")
 
 struct Penrose{T,Q,V} <: Factorization{T}
     QR::Q
