@@ -34,9 +34,9 @@ ss(p::LinearFractal, k) = p.s[k+1]
 function genfractal(p::LinearFractal{N,T}, n::Integer, tt::AbstractFloat) where {N,T}
     n >= 0 || throw(ArgumentError("n must not be negative"))
     N > 0 || throw(ArgumentError("N must be positive"))
-    n = min(n, Integer(ceil(log(N, inv(eps(eltype(tt)))))))
+    n = min(n, Integer(ceil(log(N, inv(eps(eltype(tt))))))) # N^n not larger that precision
     H = hh(p, N)
-    t1, tt = divrem(tt, one(T))
+    t1, tt = fldmod(tt, one(T))
     t = intprod(tt, N, n)
     x, y = zeros(T, 2)
     for _ = 1:n
@@ -45,7 +45,7 @@ function genfractal(p::LinearFractal{N,T}, n::Integer, tt::AbstractFloat) where 
         x, y = (c * x - s * y) * h, (s * x + c * y) * h
         x, y = x + v, y + w
     end
-    if t1 > 0
+    if !iszero(t1)
         x += xx(p, N) * t1
         y += yy(p, N) * t1
     end
