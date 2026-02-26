@@ -13,6 +13,7 @@ import Base: size
 
 include("householder.jl")
 include("fractals.jl")
+include("zerofinding.jl")
 
 struct Penrose{T,Q,V} <: Factorization{T}
     QR::Q
