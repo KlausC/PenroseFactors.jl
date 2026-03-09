@@ -12,6 +12,7 @@ StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 [compat]
 LinearAlgebra = "1.12"
 MultiFloats = "3"
+Roots = "2"
 StaticArrays = "1.9"
 julia = "1.10"
 
