@@ -24,13 +24,17 @@ end
 size(pf::Penrose) = size(pf.QR)
 size(pf::Penrose, i::Integer) = size(pf.QR, i)
 
+function Base.propertynames(::T) where T<:Penrose
+    (:U, :R, :V, :p, :P, fieldnames(T)...)
+end
+
 function Base.getproperty(F::Penrose{T}, s::Symbol) where T
     if s === :U
         Q = getfield(F, :QR).Q
         r = size(getfield(F, :RQ), 1)
         r == length(Q.τ) ? Q : QRPackedQ(view(Q.factors, :, 1:r), view(Q.τ, 1:r))
     elseif s === :R
-        return getfield(F, :RQ).R
+        getfield(F, :RQ).R
     elseif s === :V
         getfield(F, :RQ).Q
     elseif s == :p
@@ -42,7 +46,7 @@ function Base.getproperty(F::Penrose{T}, s::Symbol) where T
         for i in 1:n
             P[p[i], i] = one(T)
         end
-        return P
+        P
     else
         getfield(F, s)
     end
