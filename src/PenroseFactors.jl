@@ -37,7 +37,7 @@ function Base.getproperty(F::Penrose{T}, s::Symbol) where T
         getfield(F, :RQ).R
     elseif s === :V
         getfield(F, :RQ).Q
-    elseif s == :p
+    elseif s === :p
         getfield(F, :QR).p
     elseif s === :P
         p = F.p
